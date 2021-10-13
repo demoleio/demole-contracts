@@ -12,15 +12,15 @@ contract DemoleToken is ERC20("Defi Monster Legends", "DMLG") {
     }
 
     constructor () public {
-        _mint(msg.sender, 1000000000e18); // initial supply: 1000000000 DMLG
+        governance = msg.sender;
+        _mint(msg.sender, 500000000e18); // initial supply: 500,000,000 DMLG
     }
 
     function mint(address account, uint256 amount) public onlyGovernance {
         _mint(account, amount);
     }
 
-    function setGovernance (address _governance) public {
-        require(governance == address(0), "setGovernance: governance is installed");
+    function setGovernance (address _governance) public onlyGovernance {
         governance = _governance;
     }
 
