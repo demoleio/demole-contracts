@@ -1,6 +1,7 @@
 const hre = require('hardhat')
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+const ownerCut = 1000
 
 module.exports = async function() {
     const accounts = await hre.web3.eth.getAccounts();
@@ -30,5 +31,10 @@ module.exports = async function() {
     const NFTSale = await hre.artifacts.require("DemoleNFTSaleV1Test"); 
     const nftSale = await NFTSale.new(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, nft.address)
 
-    return {token, gorvernor, tokenSale, nft, nftSale}
+    // delpoy market
+    // params: [nft address]
+    const Market = await hre.artifacts.require("DemoleMarketplace");
+    const market = await Market.new(nft.address, ownerCut)
+
+    return {token, gorvernor, tokenSale, nft, nftSale, market}
 }
