@@ -1,7 +1,7 @@
 const { expect, assert } = require("chai");
 const { web3 } = require("hardhat");
 const deploy = require("../scripts/deploy");
-
+const { hexToNumber } = require("web3-utils");
 describe("Test Marketplace", () => {
     let accounts;
     let contracts;
@@ -9,18 +9,18 @@ describe("Test Marketplace", () => {
     before(async function () {
         accounts = await web3.eth.getAccounts();
         contracts = await deploy();
+        await contracts.nft.multipleMint(accounts[0], 50)
     });
 
     async function sell(tokenId, startPrice = 1, endPrice = 2, duration = 300) {
-        await contracts.nft.multipleMint(accounts[0], 50)
-        await contracts.nft.setApprovalForAll(contracts.market.address, true);
+        await contracts.nft.setApprovalForAll(contracts.market.address, true)
         await contracts.market.createAuction(tokenId, startPrice, endPrice, duration, { from: accounts[0] })
     }
 
 
     it("can't sell item when token not exists", async () => {
         try {
-            await contracts.market.createAuction(1, 1, 2, 300)
+            await contracts.market.createAuction(51, 1, 2, 300)
         } catch (error) {
             assert.include(error.message, "ERC721: owner query for nonexistent token")
         }
@@ -28,7 +28,6 @@ describe("Test Marketplace", () => {
 
     it("can't sell item when not owner of tokenId", async () => {
         try {
-            await contracts.nft.multipleMint(accounts[0], 50)
             await contracts.market.createAuction(1, 1, 2, 300, { from: accounts[1] })
         } catch (error) {
             assert.include(error.message, "seller is not owner of tokenId")
@@ -37,8 +36,7 @@ describe("Test Marketplace", () => {
 
     it("can't sell item when not approve", async () => {
         try {
-            await contracts.nft.multipleMint(accounts[0], 50)
-            await contracts.market.createAuction(1, 1, 2, 300, { from: accounts[0] })
+            await contracts.market.createAuction(0, 1, 2, 300)
         } catch (error) {
             assert.include(error.message, "ERC721: transfer caller is not owner nor approved")
         }
@@ -52,10 +50,11 @@ describe("Test Marketplace", () => {
         }
     })
 
+
     it("sell success", async () => {
         await sell(0)
-
         await contracts.market.getAuction(0)
+        assert.equal(await contracts.nft.ownerOf(0), contracts.market.address)
     })
 
     it("can't cancel item when token not sell", async () => {
@@ -76,14 +75,19 @@ describe("Test Marketplace", () => {
     })
 
     it("cancel success", async () => {
-        await sell(2)
-
-        await contracts.market.cancelAuction(1, { from: accounts[0] })
+        try {
+            await sell(2)
+            await contracts.market.cancelAuction(2, { from: accounts[0] })
+            assert.equal(await contracts.nft.ownerOf(2), accounts[0])
+            await contracts.market.getAuction(2)
+        } catch (error) {
+            assert.include(error.message, "getAuction: auction is not exists")
+        }
     })
 
     it("can't bid item when token not sell", async () => {
         try {
-            await contracts.market.bid(1)
+            await contracts.market.bid(51)
         } catch (error) {
             assert.include(error.message, "_bid: auction is not exists")
         }
@@ -109,8 +113,27 @@ describe("Test Marketplace", () => {
     })
 
     it("bid success", async () => {
-        await sell(5)
-        await contracts.market.bid(5, { value: web3.utils.toWei("1", "ether") })
+        await sell(5, web3.utils.toWei("1", "ether"), web3.utils.toWei("1", "ether"))
+
+        const balanceBuyer = await web3.eth.getBalance(accounts[1])
+        const balanceSeller = await web3.eth.getBalance(accounts[0])
+
+        const tx = await contracts.market.bid(5, { from: accounts[1], value: web3.utils.toWei("10", "ether") })
+        const gas = tx.receipt.gasUsed * hexToNumber(tx.receipt.effectiveGasPrice)
+
+        const balanceAfterBid = await web3.eth.getBalance(accounts[1])
+        const balanceAfterSell = await web3.eth.getBalance(accounts[0])
+        const sellerProceeds = web3.utils.toWei("1") - ((web3.utils.toWei("1") * 1000) / 10000)
+
+        assert.equal(await contracts.nft.ownerOf(5), accounts[1])
+
+        // check banlance buyer
+        // balanceAfterBid = balanceBefore - price - gas
+        assert.equal(web3.utils.fromWei(balanceAfterBid), web3.utils.fromWei(balanceBuyer) - 1 - web3.utils.fromWei(gas.toString()))
+
+        // check balance seller
+        // balanceAfterSell = balanceBefore + sellerProceeds
+        assert.equal(web3.utils.fromWei(balanceAfterSell), parseFloat(web3.utils.fromWei(balanceSeller)) + parseFloat(web3.utils.fromWei(sellerProceeds.toString())))
     })
 
 })
