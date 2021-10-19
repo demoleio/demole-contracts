@@ -117,13 +117,19 @@ describe("Test Marketplace", () => {
 
         const balanceBuyer = await web3.eth.getBalance(accounts[1])
         const balanceSeller = await web3.eth.getBalance(accounts[0])
+        const balanceMarket = await web3.eth.getBalance(contracts.market.address)
 
         const tx = await contracts.market.bid(5, { from: accounts[1], value: web3.utils.toWei("10", "ether") })
         const gas = tx.receipt.gasUsed * hexToNumber(tx.receipt.effectiveGasPrice)
 
         const balanceAfterBid = await web3.eth.getBalance(accounts[1])
         const balanceAfterSell = await web3.eth.getBalance(accounts[0])
+        const balanceMarketAfter = await web3.eth.getBalance(contracts.market.address)
+
+        // sellerProceeds = price - ((price * 1000) / 10000)
         const sellerProceeds = web3.utils.toWei("1") - ((web3.utils.toWei("1") * 1000) / 10000)
+        // marketProceeds = price - sellerProceeds
+        const marketProceeds = web3.utils.toWei("1") - sellerProceeds
 
         assert.equal(await contracts.nft.ownerOf(5), accounts[1])
 
@@ -134,6 +140,10 @@ describe("Test Marketplace", () => {
         // check balance seller
         // balanceAfterSell = balanceBefore + sellerProceeds
         assert.equal(web3.utils.fromWei(balanceAfterSell), parseFloat(web3.utils.fromWei(balanceSeller)) + parseFloat(web3.utils.fromWei(sellerProceeds.toString())))
+
+        // check balance market
+        // balanceMarketAfter = balanceMarket + marketProceeds
+        assert.equal(web3.utils.fromWei(balanceMarketAfter), parseFloat(web3.utils.fromWei(balanceMarket)) + parseFloat(web3.utils.fromWei(marketProceeds.toString())))
     })
 
 })
