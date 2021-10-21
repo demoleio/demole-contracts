@@ -1,5 +1,6 @@
 const { expect, assert } = require("chai");
 const { web3 } = require("hardhat");
+const { toBN } = require("web3-utils");
 const deploy = require("../scripts/deploy")
 
 function increaseBlock() {
@@ -27,13 +28,16 @@ describe("Gorvernor", () => {
         const calldatas = [web3.eth.abi.encodeParameters(["address", "uint256"], [accounts[1], web3.utils.toWei("1000").toString()])]
 
         // approve token for propose
-        await contracts.token.approve(contracts.gorvernor.address, web3.utils.toWei("10000000"))
+        await contracts.token.approve(contracts.gorvernor.address, web3.utils.toWei("5000000"))
         await contracts.gorvernor.propose(targets, values, signatures, calldatas, "mint token", 15)
     }
 
     it("propose", async () => {
+        const beforeBalance = await contracts.token.balanceOf(accounts[0])
         await propose()
-        assert.equal(await contracts.token.balanceOf(accounts[0]), web3.utils.toWei("990000000"))
+        const proposalThreshold = await contracts.gorvernor.proposalThreshold()
+        const currentBalance = await contracts.token.balanceOf(accounts[0])
+        assert.equal(beforeBalance.sub(proposalThreshold).toString(), currentBalance.toString())
     })
 
     it("can't execute when not reached endBlock", async () => {
@@ -114,9 +118,12 @@ describe("Gorvernor", () => {
     })
 
     it("proposer unlock token", async () => {
+        const beforeBalance = await contracts.token.balanceOf(accounts[0])
         await contracts.gorvernor.unlockToken(1)
-        // 990000000 (balance) - 1000 (for account 1 test) + 10000000 (unlocked)
-        assert.equal(await contracts.token.balanceOf(accounts[0]), web3.utils.toWei("999999000"))
+        const currentBalance = await contracts.token.balanceOf(accounts[0])
+        const proposalThreshold = await contracts.gorvernor.proposalThreshold()
+        // currentBalance = beforeBalance - unlocked proposalThreshold (500000)
+        assert.equal(currentBalance.toString(), beforeBalance.add(proposalThreshold).toString())
     })
 
     it("can't proposer unlock token 2 times", async () => {
@@ -155,9 +162,13 @@ describe("Gorvernor", () => {
     })
 
     it("proposer unlock token when proposal executed", async () => {
+        const beforeBalance = await contracts.token.balanceOf(accounts[0])
         await contracts.gorvernor.unlockToken(2)
-        // 989999000 (current balance) - 40000000 (for account 1 vote) + 10000000 (unlocked)
-        assert.equal(await contracts.token.balanceOf(accounts[0]), web3.utils.toWei("959999000"))
+        const proposalThreshold = await contracts.gorvernor.proposalThreshold()
+        const currentBalance = await contracts.token.balanceOf(accounts[0])
+        
+        // currentBalance = beforeBalance + unlocked proposalThreshold (500000)
+        assert.equal(currentBalance.toString(), beforeBalance.add(proposalThreshold).toString())
     })
 
     it("voter unlock token when proposal executed", async () => {
@@ -175,14 +186,17 @@ describe("Gorvernor", () => {
     })
 
     it("cancel success", async () => {
+        const beforeBalance = await contracts.token.balanceOf(accounts[0])
         await propose()
-        const tx = await contracts.gorvernor.cancel(3)
+        await contracts.gorvernor.cancel(3)
+        const currentBalance = await contracts.token.balanceOf(accounts[0])
 
-        // 949999000 (current balance) + 10000000 (unlocked)
-        assert.equal(await contracts.token.balanceOf(accounts[0]), web3.utils.toWei("959999000"))
+        // currentBalance = beforeBalance
+        assert.equal(beforeBalance.toString(), currentBalance.toString())
     })
 
     it("unlock token before cancel", async () => {
+        let beforeBalance = await contracts.token.balanceOf(accounts[0])
         await propose()
         
         // increase 15 block
@@ -190,14 +204,20 @@ describe("Gorvernor", () => {
         for(let i = 0; i < 15; i++) {
             promiseArr.push(increaseBlock())
         }
-
+        
         await contracts.gorvernor.unlockToken(4)
-        // 949999000 (current balance) + 10000000 (unlocked)
-        assert.equal(await contracts.token.balanceOf(accounts[0]), web3.utils.toWei("959999000"))
+        let currentBalance = await contracts.token.balanceOf(accounts[0])
 
+        // currentBalance = beforeBalance
+        assert.equal(currentBalance.toString(), beforeBalance.toString())
+
+        // update balance
+        beforeBalance = currentBalance
         await contracts.gorvernor.cancel(4)
-        // 959999000 (current balance)
-        assert.equal(await contracts.token.balanceOf(accounts[0]), web3.utils.toWei("959999000"))
+        currentBalance = await contracts.token.balanceOf(accounts[0])
+
+        // currentBalance = beforeBalance
+        assert.equal(beforeBalance.toString(), currentBalance.toString())
     })
 
     it("can't execute when proposal is cancelled", async () => {

@@ -2,7 +2,7 @@ const { expect, assert } = require("chai");
 const { web3 } = require("hardhat");
 const { default: MerkleTree } = require("merkletreejs");
 const deploy = require("../scripts/deploy");
-const { numberToHex, padLeft, stripHexPrefix, stringToHex } = require("web3-utils");
+const { numberToHex, padLeft, stripHexPrefix, stringToHex, toBN, toWei } = require("web3-utils");
 const keccak256 = require('keccak256');
 const { utils } = require("web3");
 const { BigNumber } = require("ethers");
@@ -31,7 +31,7 @@ describe("NFT Sale V1", () => {
     });
 
     it("mint 50 nft", async () => {
-        await contracts.nft.mint(accounts[0], 50)
+        await contracts.nft.multipleMint(accounts[0], 50)
 
         assert.equal(await contracts.nft.totalSupply(), "50")
     })
@@ -58,8 +58,8 @@ describe("NFT Sale V1", () => {
     })
 
     it("can't buy when not enough balance", async () => {
-        await web3.eth.sendTransaction({to:accounts[6], from:accounts[1], value: web3.utils.toWei("9999.9", "ether")})
-        assert.equal(await web3.eth.getBalance(accounts[1]), "99832000000000000"); // 0.099832 ether (include fee)
+        await web3.eth.sendTransaction({to:accounts[6], from:accounts[1], value: web3.utils.toWei("9999.8", "ether")})
+        assert.equal(await web3.eth.getBalance(accounts[1]), "195015832000000000"); // ~ 0.195 ether
 
         const round = 1
         const addressBuy = accounts[1]
@@ -107,12 +107,16 @@ describe("NFT Sale V1", () => {
     })
 
     it("withdraw success", async () => {
-        const currentBalance = await web3.eth.getBalance(accounts[0])
+        const beforeBalance = toBN(await web3.eth.getBalance(accounts[0]))
         // currrent balance: 9998.85389
 
         const tx = await contracts.nftSale.withdraw()
+        const currentBalance = toBN(await web3.eth.getBalance(accounts[0]))
+        const gasPrice = toBN("8000000000"); // 8000000000 wei
+        const gasFee = gasPrice.mul(toBN(tx.receipt.gasUsed))
         assert.equal(await web3.eth.getBalance(contracts.nftSale.address), "0")
-        assert.equal(await web3.eth.getBalance(accounts[0]), "9999853644928000000000") // 9999.85364 (include fee)
+        // currentBalance = beforeBalance + 1 ether - gasFee
+        assert.equal(currentBalance.toString(), beforeBalance.add(toBN(toWei("1", "ether"))).sub(gasFee).toString())
     })
 
 })
