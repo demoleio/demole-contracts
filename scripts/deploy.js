@@ -15,7 +15,7 @@ module.exports = async function() {
 
     // set gorvernor address into token contract
     // params: [gorvernor address]
-    token.setGovernance(gorvernor.address)
+    // token.setGovernance(gorvernor.address)
 
     // deploy token sale
     // params: [token address]
@@ -30,5 +30,9 @@ module.exports = async function() {
     const NFTSale = await hre.artifacts.require("DemoleNFTSaleV1Test"); 
     const nftSale = await NFTSale.new(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, nft.address)
 
-    return {token, gorvernor, tokenSale, nft, nftSale}
+    // deploy RegisterAndBuyNFT
+    const RegisterAndBuyNFT = await hre.artifacts.require("RegisterAndBuyNFT");
+    const registerAndBuyNFT = await RegisterAndBuyNFT.new(nft.address, token.address, 1000, 14)
+
+    return {token, gorvernor, tokenSale, nft, nftSale, registerAndBuyNFT}
 }
