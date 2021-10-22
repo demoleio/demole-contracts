@@ -31,6 +31,8 @@ contract DemoleNFTSaleV4 {
     uint256 public openSaleAt;
     bool public isCloseSale = false;
     bool public isCloseRegister = false;
+
+    uint256 public totalRevenue;
     
     event Register(address indexed user, uint256 amountTicket);
     event Buy(address indexed user, bool nftType, uint256[] tokenIds);
@@ -102,10 +104,17 @@ contract DemoleNFTSaleV4 {
             tokenIdsSold.push(info.tokenIds[i]);
         }
 
+        totalRevenue += info.price;
+
         emit Buy(msg.sender, _nftType, tokenIdsSold);
     }
 
     // ADMIN FUNCTIONS
+    function withdrawRevenue() external onlyGovernance {
+        token.transfer(governance, totalRevenue);
+        totalRevenue = 0;
+    }
+
     function setGovernance(address _governance) external onlyGovernance {
         governance = _governance;
     }
