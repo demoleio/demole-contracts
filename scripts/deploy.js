@@ -31,8 +31,8 @@ module.exports = async function() {
     const nftSale = await NFTSale.new(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, nft.address)
 
     // deploy RegisterAndBuyNFT
-    const RegisterAndBuyNFT = await hre.artifacts.require("RegisterAndBuyNFT");
-    const registerAndBuyNFT = await RegisterAndBuyNFT.new(nft.address, token.address, 1000, 14)
+    const DemoleNFTSaleV4 = await hre.artifacts.require("DemoleNFTSaleV4");
+    const demoleNFTSaleV4 = await DemoleNFTSaleV4.new(nft.address, token.address)
 
-    return {token, gorvernor, tokenSale, nft, nftSale, registerAndBuyNFT}
+    return {token, gorvernor, tokenSale, nft, nftSale, demoleNFTSaleV4}
 }
